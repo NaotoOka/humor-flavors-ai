@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+:root {
+  /* Purple palette */
+  --purple-50: #faf5ff;
+  --purple-100: #f3e8ff;
+  --purple-200: #e9d5ff;
+  --purple-300: #d8b4fe;
+  --purple-400: #c084fc;
+  --purple-500: #a855f7;
+  --purple-600: #9333ea;
+  --purple-700: #7c3aed;
+  --purple-800: #6b21a8;
+  --purple-900: #581c87;
+  --purple-950: #3b0764;
+
+  /* Amber palette */
+  --amber-50: #fffbeb;
+  --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-300: #fcd34d;
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+  --amber-700: #b45309;
+
+  /* Slate palette */
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  /* Semantic tokens - Light mode (default) */
+  --background: #faf8fc;
+  --foreground: var(--slate-900);
+  --card-bg: #ffffff;
+  --card-border: var(--slate-200);
+  --primary: var(--purple-600);
+  --primary-hover: var(--purple-700);
+  --accent: var(--amber-500);
+  --accent-hover: var(--amber-600);
+  --muted: var(--slate-500);
+  --muted-foreground: var(--slate-600);
+  --destructive: #ef4444;
+  --destructive-hover: #dc2626;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-hover: var(--destructive-hover);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Dark mode via class */
+:root.dark {
+  --background: #0c0a0f;
+  --foreground: var(--slate-100);
+  --card-bg: #1a0d24;
+  --card-border: rgba(139, 92, 246, 0.2);
+  --primary: var(--purple-500);
+  --primary-hover: var(--purple-400);
+  --accent: var(--amber-400);
+  --accent-hover: var(--amber-300);
+  --muted: var(--slate-400);
+  --muted-foreground: var(--slate-300);
+  --destructive: #f87171;
+  --destructive-hover: #ef4444;
+}
+
+/* System preference fallback when no class is set */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --background: #0c0a0f;
+    --foreground: var(--slate-100);
+    --card-bg: #1a0d24;
+    --card-border: rgba(139, 92, 246, 0.2);
+    --primary: var(--purple-500);
+    --primary-hover: var(--purple-400);
+    --accent: var(--amber-400);
+    --accent-hover: var(--amber-300);
+    --muted: var(--slate-400);
+    --muted-foreground: var(--slate-300);
+    --destructive: #f87171;
+    --destructive-hover: #ef4444;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Utility classes */
+.gradient-dark-sidebar {
+  background: linear-gradient(to bottom, #1a0d24, #120820);
+}
+
+.scrollbar-green::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-green::-webkit-scrollbar-track {
+  background: #166534;
+}
+
+.scrollbar-green::-webkit-scrollbar-thumb {
+  background: #22c55e;
+  border-radius: 4px;
+}
+
+/* Glass card effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--card-border);
+  }
+}
