@@ -8,7 +8,7 @@ import { AdminHeader } from "@/components/admin/AdminHeader";
 import { Button } from "@/components/ui/Button";
 import type { HumorFlavor, CaptionWithImage } from "@/lib/types";
 
-interface CaptionsClientProps {
+interface CaptionsListProps {
   profile: {
     first_name: string | null;
     email: string | null;
@@ -22,14 +22,14 @@ interface CaptionsClientProps {
   pageSize: number;
 }
 
-export function CaptionsClient({
+export function CaptionsList({
   profile,
   flavor,
   captions,
   totalCount,
   currentPage,
   pageSize,
-}: CaptionsClientProps) {
+}: CaptionsListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [expandedCaptions, setExpandedCaptions] = useState<Set<string>>(new Set());

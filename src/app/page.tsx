@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import LoginButton from "@/components/LoginButton";
+import LoginButton from "@/components/auth/LoginButton";
 
 export default async function Home() {
   const supabase = await createClient();

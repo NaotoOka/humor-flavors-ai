@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { TestFlavorModal } from "@/components/admin/TestFlavorModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -11,7 +12,6 @@ import { Select } from "@/components/ui/Select";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { createClient } from "@/lib/supabase/client";
-import { uploadImageToPipeline, pipelineApi } from "@/lib/api";
 import type {
   HumorFlavor,
   HumorFlavorStep,
@@ -22,7 +22,7 @@ import type {
   StudyImageSet,
 } from "@/lib/types";
 
-interface FlavorDetailClientProps {
+interface FlavorDetailProps {
   profile: {
     first_name: string | null;
     email: string | null;
@@ -60,7 +60,7 @@ const defaultStepFormData: StepFormData = {
   llm_user_prompt: "",
 };
 
-export function FlavorDetailClient({
+export function FlavorDetail({
   profile,
   flavor,
   initialSteps,
@@ -69,7 +69,7 @@ export function FlavorDetailClient({
   llmOutputTypes,
   stepTypes,
   studyImageSets,
-}: FlavorDetailClientProps) {
+}: FlavorDetailProps) {
   const router = useRouter();
   const [steps, setSteps] = useState<HumorFlavorStep[]>(initialSteps);
   const [isCreateStepModalOpen, setIsCreateStepModalOpen] = useState(false);
@@ -80,18 +80,7 @@ export function FlavorDetailClient({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draggedStepId, setDraggedStepId] = useState<number | null>(null);
-
-  // Test modal state
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
-  const [testImageSource, setTestImageSource] = useState<"upload" | "study-set">("upload");
-  const [testImage, setTestImage] = useState<File | null>(null);
-  const [testImagePreview, setTestImagePreview] = useState<string | null>(null);
-  const [selectedStudyImageSetId, setSelectedStudyImageSetId] = useState<string>("");
-  const [selectedStudyImageId, setSelectedStudyImageId] = useState<string>("");
-  const [testCaptions, setTestCaptions] = useState<string[]>([]);
-  const [isTestLoading, setIsTestLoading] = useState(false);
-  const [testError, setTestError] = useState<string | null>(null);
-  const [testStep, setTestStep] = useState<"upload" | "generating" | "done">("upload");
 
   const modelOptions = llmModels.map((m) => ({ value: m.id, label: m.name }));
   const inputTypeOptions = llmInputTypes.map((t) => ({
@@ -106,24 +95,6 @@ export function FlavorDetailClient({
     value: t.id,
     label: t.description,
   }));
-  const studyImageSetOptions = studyImageSets.map((set) => ({
-    value: set.id.toString(),
-    label: `${set.slug} (${set.images.length})`,
-  }));
-  const selectedStudyImageSet = studyImageSets.find(
-    (set) => set.id.toString() === selectedStudyImageSetId
-  );
-  const selectedStudyImage = selectedStudyImageSet?.images.find(
-    (image) => image.id === selectedStudyImageId
-  );
-  const studyImageOptions =
-    selectedStudyImageSet?.images.map((image, index) => ({
-      value: image.id,
-      label:
-        image.image_description?.trim() ||
-        image.url?.split("/").pop() ||
-        `Image ${index + 1}`,
-    })) || [];
 
   const handleCreateStep = async () => {
     if (!stepFormData.llm_model_id || !stepFormData.llm_input_type_id ||
@@ -366,80 +337,6 @@ export function FlavorDetailClient({
   const getOutputTypeName = (id: number) => llmOutputTypes.find((t) => t.id === id)?.slug || "Unknown";
   const getStepTypeName = (id: number) => stepTypes.find((t) => t.id === id)?.slug || "Unknown";
 
-  // Test modal handlers
-  const handleTestImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setTestImageSource("upload");
-      setTestImage(file);
-      setTestImagePreview(URL.createObjectURL(file));
-      setTestError(null);
-      setTestCaptions([]);
-      setTestStep("upload");
-    }
-  };
-
-  const handleRunTest = async () => {
-    if (testImageSource === "upload" && !testImage) {
-      setTestError("Please upload an image first");
-      return;
-    }
-
-    if (testImageSource === "study-set" && !selectedStudyImage) {
-      setTestError("Please select a study image first");
-      return;
-    }
-
-    setIsTestLoading(true);
-    setTestError(null);
-    setTestStep("generating");
-
-    try {
-      let imageId: string;
-
-      if (testImageSource === "study-set" && selectedStudyImage) {
-        imageId = selectedStudyImage.id;
-      } else {
-        // Step 1-3: Upload image to pipeline
-        const uploadedImage = await uploadImageToPipeline(testImage as File);
-        imageId = uploadedImage.imageId;
-      }
-
-      // Step 4: Generate captions with this humor flavor
-      const captions = await pipelineApi.generateCaptions(imageId, flavor.id);
-
-      // Extract caption content from response
-      const captionTexts = (captions as Array<{ content?: string }>)
-        .map((c) => c.content)
-        .filter((c): c is string => !!c);
-
-      setTestCaptions(captionTexts);
-      setTestStep("done");
-    } catch (err) {
-      setTestError(err instanceof Error ? err.message : "Failed to generate captions");
-      setTestStep("upload");
-    } finally {
-      setIsTestLoading(false);
-    }
-  };
-
-  const resetTestModal = () => {
-    setTestImageSource("upload");
-    setTestImage(null);
-    setTestImagePreview(null);
-    setSelectedStudyImageSetId("");
-    setSelectedStudyImageId("");
-    setTestCaptions([]);
-    setTestError(null);
-    setTestStep("upload");
-    setIsTestLoading(false);
-  };
-
-  const openTestModal = () => {
-    resetTestModal();
-    setIsTestModalOpen(true);
-  };
-
   return (
     <div className="relative min-h-screen bg-background overflow-hidden">
       {/* Background ambient glow */}
@@ -494,7 +391,7 @@ export function FlavorDetailClient({
             </span>
           </div>
           <div className="flex gap-3">
-            <Button variant="secondary" onClick={openTestModal}>
+            <Button variant="secondary" onClick={() => setIsTestModalOpen(true)}>
               <svg
                 className="h-4 w-4 mr-2"
                 fill="none"
@@ -648,9 +545,6 @@ export function FlavorDetailClient({
                           <span className="px-2 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold uppercase">
                             {getStepTypeName(step.humor_flavor_step_type_id)}
                           </span>
-                          <span className="px-2 py-1 rounded-lg bg-accent/10 text-accent text-[10px] font-bold uppercase">
-                            {getModelName(step.llm_model_id)}
-                          </span>
                           {step.llm_temperature && (
                             <span className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[10px] font-bold">
                               Temp: {step.llm_temperature}
@@ -683,7 +577,13 @@ export function FlavorDetailClient({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Model
+                        </span>
+                        <p className="text-foreground font-medium">{getModelName(step.llm_model_id)}</p>
+                      </div>
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                           Input Type
@@ -705,9 +605,9 @@ export function FlavorDetailClient({
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                               System Prompt
                             </span>
-                            <p className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 mt-1 font-mono line-clamp-2">
+                            <pre className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap break-words select-text cursor-text">
                               {step.llm_system_prompt}
-                            </p>
+                            </pre>
                           </div>
                         )}
                         {step.llm_user_prompt && (
@@ -715,9 +615,9 @@ export function FlavorDetailClient({
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                               User Prompt
                             </span>
-                            <p className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 mt-1 font-mono line-clamp-2">
+                            <pre className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap break-words select-text cursor-text">
                               {step.llm_user_prompt}
-                            </p>
+                            </pre>
                           </div>
                         )}
                       </div>
@@ -740,7 +640,7 @@ export function FlavorDetailClient({
         isOpen={isCreateStepModalOpen}
         onClose={() => setIsCreateStepModalOpen(false)}
         title="Add New Step"
-        size="lg"
+        size="3xl"
       >
         <StepForm
           formData={stepFormData}
@@ -749,6 +649,7 @@ export function FlavorDetailClient({
           inputTypeOptions={inputTypeOptions}
           outputTypeOptions={outputTypeOptions}
           stepTypeOptions={stepTypeOptions}
+          llmModels={llmModels}
           error={error}
           isLoading={isLoading}
           onSubmit={handleCreateStep}
@@ -762,7 +663,7 @@ export function FlavorDetailClient({
         isOpen={isEditStepModalOpen}
         onClose={() => setIsEditStepModalOpen(false)}
         title="Edit Step"
-        size="lg"
+        size="3xl"
       >
         <StepForm
           formData={stepFormData}
@@ -771,6 +672,7 @@ export function FlavorDetailClient({
           inputTypeOptions={inputTypeOptions}
           outputTypeOptions={outputTypeOptions}
           stepTypeOptions={stepTypeOptions}
+          llmModels={llmModels}
           error={error}
           isLoading={isLoading}
           onSubmit={handleUpdateStep}
@@ -792,242 +694,12 @@ export function FlavorDetailClient({
       />
 
       {/* Test Modal */}
-      <Modal
+      <TestFlavorModal
         isOpen={isTestModalOpen}
         onClose={() => setIsTestModalOpen(false)}
-        title={`Test: ${flavor.slug}`}
-        size="lg"
-      >
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <Select
-              label="Image Source"
-              value={testImageSource}
-              onChange={(e) => {
-                setTestImageSource(e.target.value as "upload" | "study-set");
-                setTestError(null);
-                setTestCaptions([]);
-                setTestStep("upload");
-              }}
-              options={[
-                { value: "upload", label: "Upload image" },
-                { value: "study-set", label: "Study image set" },
-              ]}
-              disabled={isTestLoading}
-            />
-          </div>
-
-          {testImageSource === "upload" ? (
-            <div className="space-y-3">
-              <label className="block text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Upload Test Image
-              </label>
-              <div
-                className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-                  testImagePreview
-                    ? "border-primary/50 bg-primary/5"
-                    : "border-card-border hover:border-primary/30 hover:bg-primary/5"
-                }`}
-              >
-                <input
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic"
-                  onChange={handleTestImageSelect}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  disabled={isTestLoading}
-                />
-                {testImagePreview ? (
-                  <div className="space-y-3">
-                    <img
-                      src={testImagePreview}
-                      alt="Test preview"
-                      className="max-h-48 mx-auto rounded-lg object-contain"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      {testImage?.name}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <svg
-                      className="mx-auto h-12 w-12 text-muted-foreground"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    <p className="text-sm text-muted-foreground">
-                      Click or drag an image to upload
-                    </p>
-                    <p className="text-xs text-muted-foreground/70">
-                      Supports JPEG, PNG, WebP, GIF, HEIC
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <Select
-                label="Study Image Set"
-                value={selectedStudyImageSetId}
-                onChange={(e) => {
-                  setSelectedStudyImageSetId(e.target.value);
-                  setSelectedStudyImageId("");
-                  setTestImage(null);
-                  setTestImagePreview(null);
-                  setTestError(null);
-                  setTestCaptions([]);
-                  setTestStep("upload");
-                }}
-                options={studyImageSetOptions}
-                placeholder={
-                  studyImageSetOptions.length > 0
-                    ? "Choose a study image set"
-                    : "No study image sets available"
-                }
-                disabled={isTestLoading || studyImageSetOptions.length === 0}
-              />
-
-              <Select
-                label="Study Image"
-                value={selectedStudyImageId}
-                onChange={(e) => {
-                  setSelectedStudyImageId(e.target.value);
-                  setTestError(null);
-                  setTestCaptions([]);
-                  setTestStep("upload");
-                }}
-                options={studyImageOptions}
-                placeholder={
-                  selectedStudyImageSet
-                    ? "Choose an image"
-                    : "Select a study image set first"
-                }
-                disabled={isTestLoading || !selectedStudyImageSet}
-              />
-
-              {selectedStudyImageSet?.description && (
-                <p className="text-xs text-muted-foreground">
-                  {selectedStudyImageSet.description}
-                </p>
-              )}
-
-              {selectedStudyImage?.url && (
-                <div className="rounded-xl border border-card-border bg-primary/5 p-4 space-y-3">
-                  <img
-                    src={selectedStudyImage.url}
-                    alt={selectedStudyImage.image_description || "Study image preview"}
-                    className="max-h-48 mx-auto rounded-lg object-contain"
-                  />
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p className="break-all">{selectedStudyImage.url}</p>
-                    {selectedStudyImage.image_description && (
-                      <p>{selectedStudyImage.image_description}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Progress indicator */}
-          {isTestLoading && (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
-              <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {testStep === "generating" ? "Generating captions..." : "Processing..."}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  This may take a moment
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Error display */}
-          {testError && (
-            <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-              {testError}
-            </div>
-          )}
-
-          {/* Generated Captions */}
-          {testCaptions.length > 0 && (
-            <div className="space-y-3">
-              <label className="block text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Generated Captions
-              </label>
-              <div className="space-y-2">
-                {testCaptions.map((caption, index) => (
-                  <div
-                    key={index}
-                    className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-card-border"
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-primary text-white text-xs font-bold">
-                        {index + 1}
-                      </span>
-                      <p className="text-sm text-foreground">{caption}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-3 justify-end pt-4 border-t border-card-border">
-            <Button
-              variant="secondary"
-              onClick={() => setIsTestModalOpen(false)}
-            >
-              Close
-            </Button>
-            {testCaptions.length > 0 ? (
-              <Button onClick={resetTestModal}>
-                Test Another Image
-              </Button>
-            ) : (
-              <Button
-                onClick={handleRunTest}
-                loading={isTestLoading}
-                disabled={
-                  testImageSource === "upload" ? !testImage : !selectedStudyImage
-                }
-              >
-                <svg
-                  className="h-4 w-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Generate Captions
-              </Button>
-            )}
-          </div>
-        </div>
-      </Modal>
+        flavor={flavor}
+        studyImageSets={studyImageSets}
+      />
     </div>
   );
 }
@@ -1040,6 +712,7 @@ interface StepFormProps {
   inputTypeOptions: { value: number; label: string }[];
   outputTypeOptions: { value: number; label: string }[];
   stepTypeOptions: { value: number; label: string }[];
+  llmModels: LlmModel[];
   error: string | null;
   isLoading: boolean;
   onSubmit: () => void;
@@ -1054,12 +727,15 @@ function StepForm({
   inputTypeOptions,
   outputTypeOptions,
   stepTypeOptions,
+  llmModels,
   error,
   isLoading,
   onSubmit,
   onCancel,
   submitText,
 }: StepFormProps) {
+  const selectedModel = llmModels.find((m) => m.id === formData.llm_model_id);
+  const isTemperatureSupported = selectedModel?.is_temperature_supported ?? true;
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
       <Input
@@ -1107,16 +783,22 @@ function StepForm({
         />
       </div>
 
-      <Input
-        label="Temperature"
-        type="number"
-        step="0.1"
-        min="0"
-        max="2"
-        placeholder="e.g., 0.7"
-        value={formData.llm_temperature}
-        onChange={(e) => setFormData({ ...formData, llm_temperature: e.target.value })}
-      />
+      {isTemperatureSupported ? (
+        <Input
+          label="Temperature"
+          type="number"
+          step="0.1"
+          min="0"
+          max="2"
+          placeholder="e.g., 0.7"
+          value={formData.llm_temperature}
+          onChange={(e) => setFormData({ ...formData, llm_temperature: e.target.value })}
+        />
+      ) : (
+        <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 text-sm text-muted-foreground">
+          Temperature is not supported by {selectedModel?.name || "this model"}
+        </div>
+      )}
 
       <Textarea
         label="System Prompt"

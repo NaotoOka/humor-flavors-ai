@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { HumorFlavorsClient } from "./HumorFlavorsClient";
+import { HumorFlavorsList } from "@/components/admin/HumorFlavorsList";
 import type {
   HumorFlavor,
+  HumorFlavorStep,
   LlmModel,
   LlmInputType,
   LlmOutputType,
@@ -36,22 +37,33 @@ export default async function AdminDashboard() {
     { data: llmInputTypes },
     { data: llmOutputTypes },
     { data: stepTypes },
+    { data: firstSteps },
   ] = await Promise.all([
     supabase.from("humor_flavors").select("*").order("created_datetime_utc", { ascending: false }),
     supabase.from("llm_models").select("*").order("name"),
     supabase.from("llm_input_types").select("*").order("slug"),
     supabase.from("llm_output_types").select("*").order("slug"),
     supabase.from("humor_flavor_step_types").select("*").order("slug"),
+    supabase.from("humor_flavor_steps").select("*").eq("order_by", 1),
   ]);
 
+  // Create a map of flavor_id -> first step's model_id
+  const flavorFirstStepModelMap: Record<number, number | null> = {};
+  if (firstSteps) {
+    for (const step of firstSteps as HumorFlavorStep[]) {
+      flavorFirstStepModelMap[step.humor_flavor_id] = step.llm_model_id;
+    }
+  }
+
   return (
-    <HumorFlavorsClient
+    <HumorFlavorsList
       profile={profile}
       initialFlavors={(humorFlavors as HumorFlavor[]) || []}
       llmModels={(llmModels as LlmModel[]) || []}
       llmInputTypes={(llmInputTypes as LlmInputType[]) || []}
       llmOutputTypes={(llmOutputTypes as LlmOutputType[]) || []}
       stepTypes={(stepTypes as HumorFlavorStepType[]) || []}
+      flavorFirstStepModelMap={flavorFirstStepModelMap}
     />
   );
 }

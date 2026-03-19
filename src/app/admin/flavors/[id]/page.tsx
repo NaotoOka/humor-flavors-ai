@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { FlavorDetailClient } from "./FlavorDetailClient";
+import { FlavorDetail } from "@/components/admin/FlavorDetail";
 import type {
   HumorFlavor,
   HumorFlavorStep,
@@ -89,20 +89,22 @@ export default async function FlavorDetailPage({ params }: PageProps) {
       id: set.id,
       slug: set.slug,
       description: set.description,
-      images: (set.study_image_set_image_mappings || []).flatMap((mapping) =>
-        Array.isArray(mapping.images)
-          ? mapping.images.map((image) => ({
-              id: image.id,
-              url: image.url,
-              image_description: image.image_description,
-            }))
-          : []
-      ),
+      images: (set.study_image_set_image_mappings || [])
+        .filter((mapping) => mapping.images)
+        .map((mapping) => {
+          // Supabase returns single object for foreign key relationship
+          const image = mapping.images as unknown as { id: string; url: string | null; image_description: string | null };
+          return {
+            id: image.id,
+            url: image.url,
+            image_description: image.image_description,
+          };
+        }),
     })
   );
 
   return (
-    <FlavorDetailClient
+    <FlavorDetail
       profile={profile}
       flavor={flavor as HumorFlavor}
       initialSteps={(steps as HumorFlavorStep[]) || []}

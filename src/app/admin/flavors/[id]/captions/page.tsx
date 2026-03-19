@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CaptionsClient } from "./CaptionsClient";
+import { CaptionsList } from "@/components/admin/CaptionsList";
 import type { HumorFlavor } from "@/lib/types";
 
 interface PageProps {
@@ -68,7 +68,7 @@ export default async function FlavorCaptionsPage({
     .range(from, to);
 
   return (
-    <CaptionsClient
+    <CaptionsList
       profile={profile}
       flavor={flavor as HumorFlavor}
       captions={captions || []}

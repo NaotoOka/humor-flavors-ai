@@ -36,15 +36,31 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    let errorData: Record<string, unknown> = {};
+    try {
+      const text = await response.text();
+      errorData = text ? JSON.parse(text) : {};
+    } catch {
+      // Response wasn't valid JSON (e.g., 502 HTML error page)
+    }
     throw new ApiError(
-      errorData.message || errorData.error || `HTTP ${response.status}`,
+      (errorData.message as string) || (errorData.error as string) || `HTTP ${response.status}`,
       response.status,
       errorData
     );
   }
 
-  return response.json();
+  const text = await response.text();
+  if (!text) {
+    return [] as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // Response was not valid JSON - treat it as an error message
+    throw new ApiError(text, response.status);
+  }
 }
 
 export class ApiError extends Error {

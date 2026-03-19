@@ -19,7 +19,7 @@ import type {
   HumorFlavorStepType,
 } from "@/lib/types";
 
-interface HumorFlavorsClientProps {
+interface HumorFlavorsListProps {
   profile: {
     first_name: string | null;
     email: string | null;
@@ -31,6 +31,7 @@ interface HumorFlavorsClientProps {
   llmInputTypes: LlmInputType[];
   llmOutputTypes: LlmOutputType[];
   stepTypes: HumorFlavorStepType[];
+  flavorFirstStepModelMap: Record<number, number | null>;
 }
 
 interface StepFormData {
@@ -50,17 +51,19 @@ const WIZARD_STEPS = [
   { id: 3, name: "Review", description: "Confirm & create" },
 ];
 
-export function HumorFlavorsClient({
+export function HumorFlavorsList({
   profile,
   initialFlavors,
   llmModels,
   llmInputTypes,
   llmOutputTypes,
   stepTypes,
-}: HumorFlavorsClientProps) {
+  flavorFirstStepModelMap,
+}: HumorFlavorsListProps) {
   const router = useRouter();
   const [flavors, setFlavors] = useState<HumorFlavor[]>(initialFlavors);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedModelFilter, setSelectedModelFilter] = useState<number | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -98,11 +101,24 @@ export function HumorFlavorsClient({
     llm_user_prompt: "",
   });
 
-  const filteredFlavors = flavors.filter(
-    (flavor) =>
+  const getFlavorFirstModelName = (flavorId: number) => {
+    const modelId = flavorFirstStepModelMap[flavorId];
+    if (!modelId) return null;
+    return llmModels.find((m) => m.id === modelId)?.name || null;
+  };
+
+  const filteredFlavors = flavors.filter((flavor) => {
+    const matchesSearch =
       flavor.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      flavor.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      flavor.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      getFlavorFirstModelName(flavor.id)?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesModel =
+      selectedModelFilter === null ||
+      flavorFirstStepModelMap[flavor.id] === selectedModelFilter;
+
+    return matchesSearch && matchesModel;
+  });
 
   const resetWizard = () => {
     setWizardStep(1);
@@ -231,6 +247,70 @@ export function HumorFlavorsClient({
     }
   };
 
+  const handleDuplicate = async () => {
+    if (!selectedFlavor) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const supabase = createClient();
+
+      // Create new flavor with "copy-" prefix
+      const newSlug = `copy-${selectedFlavor.slug}`;
+      const { data: newFlavor, error: insertError } = await supabase
+        .from("humor_flavors")
+        .insert({
+          slug: newSlug,
+          description: selectedFlavor.description,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Fetch and duplicate all steps from the original flavor
+      const { data: originalSteps, error: stepsError } = await supabase
+        .from("humor_flavor_steps")
+        .select("*")
+        .eq("humor_flavor_id", selectedFlavor.id)
+        .order("order_by");
+
+      if (stepsError) throw stepsError;
+
+      if (originalSteps && originalSteps.length > 0) {
+        const stepsToInsert = originalSteps.map((step) => ({
+          humor_flavor_id: newFlavor.id,
+          order_by: step.order_by,
+          llm_model_id: step.llm_model_id,
+          llm_input_type_id: step.llm_input_type_id,
+          llm_output_type_id: step.llm_output_type_id,
+          humor_flavor_step_type_id: step.humor_flavor_step_type_id,
+          llm_temperature: step.llm_temperature,
+          llm_system_prompt: step.llm_system_prompt,
+          llm_user_prompt: step.llm_user_prompt,
+          description: step.description,
+        }));
+
+        const { error: insertStepsError } = await supabase
+          .from("humor_flavor_steps")
+          .insert(stepsToInsert);
+
+        if (insertStepsError) throw insertStepsError;
+      }
+
+      setFlavors([newFlavor as HumorFlavor, ...flavors]);
+      setIsEditModalOpen(false);
+      setSelectedFlavor(null);
+      setFormData({ slug: "", description: "" });
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to duplicate flavor");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const openEditModal = (flavor: HumorFlavor) => {
     setSelectedFlavor(flavor);
     setFormData({
@@ -312,12 +392,24 @@ export function HumorFlavorsClient({
           </Button>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <Input
-            placeholder="Search flavors by slug or description..."
+            placeholder="Search by slug, description, or model..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="max-w-md"
+          />
+          <Select
+            options={[
+              { value: 0, label: "All Models" },
+              ...llmModels.map((m) => ({ value: m.id, label: m.name })),
+            ]}
+            value={selectedModelFilter ?? 0}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              setSelectedModelFilter(val === 0 ? null : val);
+            }}
+            className="max-w-[200px]"
           />
         </div>
 
@@ -410,9 +502,17 @@ export function HumorFlavorsClient({
                   </div>
                 </div>
 
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-4 min-h-[40px]">
+                <p className="text-sm text-muted-foreground line-clamp-2 mb-3 min-h-[40px]">
                   {flavor.description || "No description provided"}
                 </p>
+
+                {getFlavorFirstModelName(flavor.id) && (
+                  <div className="mb-3">
+                    <span className="px-2 py-1 rounded-lg bg-accent/10 text-accent text-[10px] font-bold uppercase">
+                      {getFlavorFirstModelName(flavor.id)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold text-muted-foreground">
@@ -576,7 +676,16 @@ export function HumorFlavorsClient({
                               label="LLM Model"
                               options={modelOptions}
                               value={step.llm_model_id}
-                              onChange={(e) => updateWizardStep(index, { llm_model_id: parseInt(e.target.value) })}
+                              onChange={(e) => {
+                                const newModelId = parseInt(e.target.value);
+                                const newModel = llmModels.find((m) => m.id === newModelId);
+                                const updates: Partial<StepFormData> = { llm_model_id: newModelId };
+                                // Clear temperature if new model doesn't support it
+                                if (newModel && !newModel.is_temperature_supported) {
+                                  updates.llm_temperature = "";
+                                }
+                                updateWizardStep(index, updates);
+                              }}
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
@@ -593,16 +702,26 @@ export function HumorFlavorsClient({
                               onChange={(e) => updateWizardStep(index, { llm_output_type_id: parseInt(e.target.value) })}
                             />
                           </div>
-                          <Input
-                            label="Temperature"
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="2"
-                            placeholder="0.7"
-                            value={step.llm_temperature}
-                            onChange={(e) => updateWizardStep(index, { llm_temperature: e.target.value })}
-                          />
+                          {(() => {
+                            const selectedModel = llmModels.find((m) => m.id === step.llm_model_id);
+                            const isTemperatureSupported = selectedModel?.is_temperature_supported ?? true;
+                            return isTemperatureSupported ? (
+                              <Input
+                                label="Temperature"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="2"
+                                placeholder="0.7"
+                                value={step.llm_temperature}
+                                onChange={(e) => updateWizardStep(index, { llm_temperature: e.target.value })}
+                              />
+                            ) : (
+                              <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 text-sm text-muted-foreground">
+                                Temperature is not supported by {selectedModel?.name || "this model"}
+                              </div>
+                            );
+                          })()}
                           <Textarea
                             label="System Prompt"
                             placeholder="Enter the system prompt..."
@@ -738,16 +857,39 @@ export function HumorFlavorsClient({
             }
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex gap-3 justify-end pt-4">
-            <Button
-              variant="secondary"
-              onClick={() => setIsEditModalOpen(false)}
+          <div className="flex items-center justify-between pt-4">
+            <button
+              type="button"
+              onClick={handleDuplicate}
+              disabled={isLoading}
+              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-primary/80 hover:text-primary hover:bg-primary/10 rounded-lg border border-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Cancel
-            </Button>
-            <Button onClick={handleUpdate} loading={isLoading}>
-              Save Changes
-            </Button>
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
+              Duplicate
+            </button>
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleUpdate} loading={isLoading}>
+                Save Changes
+              </Button>
+            </div>
           </div>
         </div>
       </Modal>
