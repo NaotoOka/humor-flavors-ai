@@ -159,6 +159,7 @@ export function FlavorDetail({
           llm_system_prompt: stepFormData.llm_system_prompt.trim() || null,
           llm_user_prompt: stepFormData.llm_user_prompt.trim() || null,
           description: stepFormData.description.trim() || null,
+          modified_datetime_utc: new Date().toISOString(),
         })
         .eq("id", selectedStep.id)
         .select()

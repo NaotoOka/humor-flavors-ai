@@ -41,4 +41,6 @@ yarn-error.log*
 next-env.d.ts
 AUTH_SETUP_GUIDE.md
 Assignment5.md
+CLAUDE.md
 schema.sql
+new-schema.sql

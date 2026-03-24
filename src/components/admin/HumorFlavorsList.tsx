@@ -200,6 +200,7 @@ export function HumorFlavorsList({
         .update({
           slug: formData.slug.trim().toLowerCase().replace(/\s+/g, "-"),
           description: formData.description.trim() || null,
+          modified_datetime_utc: new Date().toISOString(),
         })
         .eq("id", selectedFlavor.id)
         .select()
