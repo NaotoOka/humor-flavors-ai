@@ -155,7 +155,7 @@ export function CaptionsList({
                 >
                   {/* Image */}
                   {caption.images?.url && (
-                    <div className="relative aspect-video bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div className="relative aspect-video bg-card-bg overflow-hidden">
                       <Image
                         src={caption.images.url}
                         alt="Caption source image"
@@ -275,7 +275,7 @@ export function CaptionsList({
                         className={`h-8 w-8 rounded-lg text-xs font-bold transition-colors ${
                           currentPage === pageNum
                             ? "bg-primary text-white"
-                            : "text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                            : "text-muted-foreground hover:text-foreground hover:bg-card-bg/80"
                         }`}
                       >
                         {pageNum}

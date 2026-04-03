@@ -51,6 +51,69 @@ const WIZARD_STEPS = [
   { id: 3, name: "Review", description: "Confirm & create" },
 ];
 
+// Expandable Textarea Component
+interface ExpandableTextareaProps {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function ExpandableTextarea({ label, placeholder, value, onChange }: ExpandableTextareaProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+            {label}
+          </label>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="p-1 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+            title="Expand"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </button>
+        </div>
+        <textarea
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-xl border border-card-border bg-card-bg px-4 py-2.5 text-sm text-foreground placeholder:text-muted transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-y min-h-[80px]"
+        />
+      </div>
+
+      {/* Expanded Modal */}
+      <Modal
+        isOpen={isExpanded}
+        onClose={() => setIsExpanded(false)}
+        title={label}
+        size="full"
+      >
+        <div className="space-y-4">
+          <textarea
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full rounded-xl border border-card-border bg-card-bg px-4 py-3 text-sm text-foreground placeholder:text-muted transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none h-[70vh] font-mono"
+            autoFocus
+          />
+          <div className="flex justify-end pt-2">
+            <Button variant="secondary" onClick={() => setIsExpanded(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 export function HumorFlavorsList({
   profile,
   initialFlavors,
@@ -75,6 +138,7 @@ export function HumorFlavorsList({
   // Wizard state
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardSteps, setWizardSteps] = useState<StepFormData[]>([]);
+  const [isVariablesModalOpen, setIsVariablesModalOpen] = useState(false);
 
   const modelOptions = llmModels.map((m) => ({ value: m.id, label: m.name }));
   const inputTypeOptions = llmInputTypes.map((t) => ({
@@ -248,9 +312,7 @@ export function HumorFlavorsList({
     }
   };
 
-  const handleDuplicate = async () => {
-    if (!selectedFlavor) return;
-
+  const handleDuplicate = async (flavor: HumorFlavor) => {
     setIsLoading(true);
     setError(null);
 
@@ -258,12 +320,12 @@ export function HumorFlavorsList({
       const supabase = createClient();
 
       // Create new flavor with "copy-" prefix
-      const newSlug = `copy-${selectedFlavor.slug}`;
+      const newSlug = `copy-${flavor.slug}`;
       const { data: newFlavor, error: insertError } = await supabase
         .from("humor_flavors")
         .insert({
           slug: newSlug,
-          description: selectedFlavor.description,
+          description: flavor.description,
         })
         .select()
         .single();
@@ -274,7 +336,7 @@ export function HumorFlavorsList({
       const { data: originalSteps, error: stepsError } = await supabase
         .from("humor_flavor_steps")
         .select("*")
-        .eq("humor_flavor_id", selectedFlavor.id)
+        .eq("humor_flavor_id", flavor.id)
         .order("order_by");
 
       if (stepsError) throw stepsError;
@@ -301,9 +363,6 @@ export function HumorFlavorsList({
       }
 
       setFlavors([newFlavor as HumorFlavor, ...flavors]);
-      setIsEditModalOpen(false);
-      setSelectedFlavor(null);
-      setFormData({ slug: "", description: "" });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to duplicate flavor");
@@ -463,6 +522,25 @@ export function HumorFlavorsList({
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      onClick={() => handleDuplicate(flavor)}
+                      className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Duplicate"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </button>
+                    <button
                       onClick={() => openEditModal(flavor)}
                       className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                       title="Edit"
@@ -567,7 +645,7 @@ export function HumorFlavorsList({
                         ? "bg-primary text-white"
                         : wizardStep === step.id
                         ? "bg-primary text-white ring-4 ring-primary/20"
-                        : "bg-slate-200 dark:bg-slate-700 text-muted-foreground"
+                        : "bg-card-bg border border-card-border text-muted-foreground"
                     }`}
                   >
                     {wizardStep > step.id ? (
@@ -586,7 +664,7 @@ export function HumorFlavorsList({
               ))}
             </div>
             {/* Progress line */}
-            <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-200 dark:bg-slate-700 -z-10 mx-16">
+            <div className="absolute top-5 left-0 right-0 h-0.5 bg-card-border -z-10 mx-16">
               <div
                 className="h-full bg-primary transition-all duration-300"
                 style={{ width: `${((wizardStep - 1) / (WIZARD_STEPS.length - 1)) * 100}%` }}
@@ -718,24 +796,34 @@ export function HumorFlavorsList({
                                 onChange={(e) => updateWizardStep(index, { llm_temperature: e.target.value })}
                               />
                             ) : (
-                              <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 text-sm text-muted-foreground">
+                              <div className="p-3 rounded-lg bg-card-bg/50 border border-card-border text-sm text-muted-foreground">
                                 Temperature is not supported by {selectedModel?.name || "this model"}
                               </div>
                             );
                           })()}
-                          <Textarea
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setIsVariablesModalOpen(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-primary hover:text-primary-hover hover:bg-primary/10 rounded-lg transition-colors"
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              Prompt Variables
+                            </button>
+                          </div>
+                          <ExpandableTextarea
                             label="System Prompt"
                             placeholder="Enter the system prompt..."
                             value={step.llm_system_prompt}
-                            onChange={(e) => updateWizardStep(index, { llm_system_prompt: e.target.value })}
-                            className="min-h-[80px]"
+                            onChange={(value) => updateWizardStep(index, { llm_system_prompt: value })}
                           />
-                          <Textarea
+                          <ExpandableTextarea
                             label="User Prompt"
                             placeholder="Enter the user prompt template..."
                             value={step.llm_user_prompt}
-                            onChange={(e) => updateWizardStep(index, { llm_user_prompt: e.target.value })}
-                            className="min-h-[80px]"
+                            onChange={(value) => updateWizardStep(index, { llm_user_prompt: value })}
                           />
                         </div>
                       </div>
@@ -774,7 +862,7 @@ export function HumorFlavorsList({
                   ) : (
                     <div className="space-y-3">
                       {wizardSteps.map((step, index) => (
-                        <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                        <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-card-bg/50 border border-card-border">
                           <span className="flex h-6 w-6 items-center justify-center rounded bg-primary text-white text-xs font-bold">
                             {index + 1}
                           </span>
@@ -858,39 +946,16 @@ export function HumorFlavorsList({
             }
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex items-center justify-between pt-4">
-            <button
-              type="button"
-              onClick={handleDuplicate}
-              disabled={isLoading}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-primary/80 hover:text-primary hover:bg-primary/10 rounded-lg border border-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="secondary"
+              onClick={() => setIsEditModalOpen(false)}
             >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-              Duplicate
-            </button>
-            <div className="flex gap-3">
-              <Button
-                variant="secondary"
-                onClick={() => setIsEditModalOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleUpdate} loading={isLoading}>
-                Save Changes
-              </Button>
-            </div>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} loading={isLoading}>
+              Save Changes
+            </Button>
           </div>
         </div>
       </Modal>
@@ -905,6 +970,64 @@ export function HumorFlavorsList({
         variant="destructive"
         loading={isLoading}
       />
+
+      {/* Prompt Variables Modal */}
+      <Modal
+        isOpen={isVariablesModalOpen}
+        onClose={() => setIsVariablesModalOpen(false)}
+        title="Prompt Variables"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Use these placeholders to pull in pipeline outputs, image details, and community context.
+          </p>
+
+          <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-2">
+            {[
+              '${stepNOutput}',
+              '${imageDescription}',
+              '${imageAdditionalContext}',
+              '${allCommunityContexts}',
+              '${tenRandomCommunityContexts}',
+              '${fiveRelevantCommunityContexts}',
+              '${allTerms}',
+              '${tenRandomTerms}',
+              '${allCaptionExamples}',
+              '${tenRandomCaptionExamples}',
+              '${startRandomizeLines}',
+              '${endRandomizeLines}',
+            ].map((variable) => (
+              <div
+                key={variable}
+                className="flex items-center justify-between p-3 rounded-lg bg-card-bg/50 border border-card-border"
+              >
+                <code className="text-sm font-mono text-foreground">{variable}</code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(variable);
+                  }}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-card-border">
+            <Button
+              variant="secondary"
+              onClick={() => setIsVariablesModalOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

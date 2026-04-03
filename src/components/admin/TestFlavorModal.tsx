@@ -258,7 +258,7 @@ export function TestFlavorModal({
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                        <div className="w-full h-full bg-card-bg flex items-center justify-center">
                           <svg
                             className="h-8 w-8 text-muted-foreground"
                             fill="none"
@@ -343,7 +343,7 @@ export function TestFlavorModal({
               {captions.map((caption, index) => (
                 <div
                   key={`${generationId}-${index}`}
-                  className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-card-border"
+                  className="p-4 rounded-xl bg-card-bg/50 border border-card-border"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex-shrink-0 h-6 w-6 flex items-center justify-center rounded-full bg-primary text-white text-xs font-bold">

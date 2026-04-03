@@ -7,7 +7,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "full";
 }
 
 export function Modal({
@@ -45,6 +45,10 @@ export function Modal({
     "2xl": "max-w-2xl",
     "3xl": "max-w-3xl",
     "4xl": "max-w-4xl",
+    "5xl": "max-w-5xl",
+    "6xl": "max-w-6xl",
+    "7xl": "max-w-7xl",
+    "full": "max-w-[95vw]",
   };
 
   return (
@@ -56,9 +60,9 @@ export function Modal({
       }}
     >
       <div
-        className={`w-full ${sizes[size]} bg-card-bg border border-card-border rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200`}
+        className={`w-full ${sizes[size]} max-h-[90vh] flex flex-col bg-card-bg border border-card-border rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200`}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-card-border">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-card-border flex-shrink-0">
           <h2 className="text-lg font-black uppercase tracking-wider text-foreground">
             {title}
           </h2>
@@ -81,7 +85,7 @@ export function Modal({
             </svg>
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   );

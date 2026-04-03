@@ -30,9 +30,16 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Invalid refresh token - clear session and redirect to login
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
 
   // Protect admin routes
   if (request.nextUrl.pathname.startsWith("/admin")) {

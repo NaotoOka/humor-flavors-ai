@@ -79,7 +79,6 @@ export function FlavorDetail({
   const [stepFormData, setStepFormData] = useState<StepFormData>(defaultStepFormData);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draggedStepId, setDraggedStepId] = useState<number | null>(null);
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
 
   const modelOptions = llmModels.map((m) => ({ value: m.id, label: m.name }));
@@ -281,58 +280,6 @@ export function FlavorDetail({
     [steps, router]
   );
 
-  const handleDragStart = (stepId: number) => {
-    setDraggedStepId(stepId);
-  };
-
-  const handleDragOver = (e: React.DragEvent, targetStepId: number) => {
-    e.preventDefault();
-    if (draggedStepId === null || draggedStepId === targetStepId) return;
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetStepId: number) => {
-    e.preventDefault();
-    if (draggedStepId === null || draggedStepId === targetStepId) return;
-
-    const draggedIndex = steps.findIndex((s) => s.id === draggedStepId);
-    const targetIndex = steps.findIndex((s) => s.id === targetStepId);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const supabase = createClient();
-      const newSteps = [...steps];
-      const [removed] = newSteps.splice(draggedIndex, 1);
-      newSteps.splice(targetIndex, 0, removed);
-
-      const updatedSteps = newSteps.map((s, index) => ({
-        ...s,
-        order_by: index + 1,
-      }));
-
-      // Update all order_by values in database
-      await Promise.all(
-        updatedSteps.map((step) =>
-          supabase
-            .from("humor_flavor_steps")
-            .update({ order_by: step.order_by })
-            .eq("id", step.id)
-        )
-      );
-
-      setSteps(updatedSteps);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reorder steps");
-    } finally {
-      setIsLoading(false);
-      setDraggedStepId(null);
-    }
-  };
-
   const getModelName = (id: number) => llmModels.find((m) => m.id === id)?.name || "Unknown";
   const getInputTypeName = (id: number) => llmInputTypes.find((t) => t.id === id)?.slug || "Unknown";
   const getOutputTypeName = (id: number) => llmOutputTypes.find((t) => t.id === id)?.slug || "Unknown";
@@ -497,42 +444,34 @@ export function FlavorDetail({
             {steps.map((step, index) => (
               <div
                 key={step.id}
-                draggable
-                onDragStart={() => handleDragStart(step.id)}
-                onDragOver={(e) => handleDragOver(e, step.id)}
-                onDrop={(e) => handleDrop(e, step.id)}
-                className={`glass-card group relative rounded-2xl p-6 transition-all duration-300 hover:shadow-xl cursor-move ${
-                  draggedStepId === step.id ? "opacity-50" : ""
-                }`}
+                className="glass-card group relative rounded-2xl p-6 transition-all duration-300 hover:shadow-xl"
               >
                 <div className="flex items-start gap-4">
-                  {/* Step Number */}
-                  <div className="flex flex-col items-center gap-1">
+                  {/* Step Number and Move Buttons */}
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      onClick={() => handleMoveStep(step.id, "up")}
+                      disabled={index === 0 || isLoading}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-card-bg border border-card-border text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-card-bg disabled:hover:border-card-border disabled:hover:text-muted-foreground transition-all"
+                      title="Move up"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white font-black text-lg shadow-lg shadow-primary/25">
                       {index + 1}
                     </div>
-                    <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleMoveStep(step.id, "up")}
-                        disabled={index === 0 || isLoading}
-                        className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title="Move up"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleMoveStep(step.id, "down")}
-                        disabled={index === steps.length - 1 || isLoading}
-                        className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title="Move down"
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleMoveStep(step.id, "down")}
+                      disabled={index === steps.length - 1 || isLoading}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-card-bg border border-card-border text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/10 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-card-bg disabled:hover:border-card-border disabled:hover:text-muted-foreground transition-all"
+                      title="Move down"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
                   </div>
 
                   {/* Step Content */}
@@ -547,7 +486,7 @@ export function FlavorDetail({
                             {getStepTypeName(step.humor_flavor_step_type_id)}
                           </span>
                           {step.llm_temperature && (
-                            <span className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-muted-foreground text-[10px] font-bold">
+                            <span className="px-2 py-1 rounded-lg bg-card-bg/50 border border-card-border text-muted-foreground text-[10px] font-bold">
                               Temp: {step.llm_temperature}
                             </span>
                           )}
@@ -606,7 +545,7 @@ export function FlavorDetail({
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                               System Prompt
                             </span>
-                            <pre className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap break-words select-text cursor-text">
+                            <pre className="text-sm text-foreground bg-card-bg/50 border border-card-border rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap break-words select-text cursor-text">
                               {step.llm_system_prompt}
                             </pre>
                           </div>
@@ -616,7 +555,7 @@ export function FlavorDetail({
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                               User Prompt
                             </span>
-                            <pre className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap break-words select-text cursor-text">
+                            <pre className="text-sm text-foreground bg-card-bg/50 border border-card-border rounded-lg p-3 mt-1 font-mono whitespace-pre-wrap break-words select-text cursor-text">
                               {step.llm_user_prompt}
                             </pre>
                           </div>
@@ -705,6 +644,85 @@ export function FlavorDetail({
   );
 }
 
+// Prompt Variables constant
+const PROMPT_VARIABLES = [
+  '${stepNOutput}',
+  '${imageDescription}',
+  '${imageAdditionalContext}',
+  '${allCommunityContexts}',
+  '${tenRandomCommunityContexts}',
+  '${fiveRelevantCommunityContexts}',
+  '${allTerms}',
+  '${tenRandomTerms}',
+  '${allCaptionExamples}',
+  '${tenRandomCaptionExamples}',
+  '${startRandomizeLines}',
+  '${endRandomizeLines}',
+];
+
+// Expandable Textarea Component
+interface ExpandableTextareaProps {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function ExpandableTextarea({ label, placeholder, value, onChange }: ExpandableTextareaProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+            {label}
+          </label>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="p-1 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+            title="Expand"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </button>
+        </div>
+        <textarea
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-xl border border-card-border bg-card-bg px-4 py-2.5 text-sm text-foreground placeholder:text-muted transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-y min-h-[100px]"
+        />
+      </div>
+
+      {/* Expanded Modal */}
+      <Modal
+        isOpen={isExpanded}
+        onClose={() => setIsExpanded(false)}
+        title={label}
+        size="full"
+      >
+        <div className="space-y-4">
+          <textarea
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full rounded-xl border border-card-border bg-card-bg px-4 py-3 text-sm text-foreground placeholder:text-muted transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none h-[70vh] font-mono"
+            autoFocus
+          />
+          <div className="flex justify-end pt-2">
+            <Button variant="secondary" onClick={() => setIsExpanded(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 // Step Form Component
 interface StepFormProps {
   formData: StepFormData;
@@ -735,6 +753,7 @@ function StepForm({
   onCancel,
   submitText,
 }: StepFormProps) {
+  const [isVariablesModalOpen, setIsVariablesModalOpen] = useState(false);
   const selectedModel = llmModels.find((m) => m.id === formData.llm_model_id);
   const isTemperatureSupported = selectedModel?.is_temperature_supported ?? true;
   return (
@@ -796,25 +815,36 @@ function StepForm({
           onChange={(e) => setFormData({ ...formData, llm_temperature: e.target.value })}
         />
       ) : (
-        <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 text-sm text-muted-foreground">
+        <div className="p-3 rounded-lg bg-card-bg/50 border border-card-border text-sm text-muted-foreground">
           Temperature is not supported by {selectedModel?.name || "this model"}
         </div>
       )}
 
-      <Textarea
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setIsVariablesModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-primary hover:text-primary-hover hover:bg-primary/10 rounded-lg transition-colors"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          Prompt Variables
+        </button>
+      </div>
+
+      <ExpandableTextarea
         label="System Prompt"
         placeholder="Enter the system prompt for this step..."
         value={formData.llm_system_prompt}
-        onChange={(e) => setFormData({ ...formData, llm_system_prompt: e.target.value })}
-        className="min-h-[100px]"
+        onChange={(value) => setFormData({ ...formData, llm_system_prompt: value })}
       />
 
-      <Textarea
+      <ExpandableTextarea
         label="User Prompt"
         placeholder="Enter the user prompt template for this step..."
         value={formData.llm_user_prompt}
-        onChange={(e) => setFormData({ ...formData, llm_user_prompt: e.target.value })}
-        className="min-h-[100px]"
+        onChange={(value) => setFormData({ ...formData, llm_user_prompt: value })}
       />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -827,6 +857,51 @@ function StepForm({
           {submitText}
         </Button>
       </div>
+
+      {/* Prompt Variables Modal */}
+      <Modal
+        isOpen={isVariablesModalOpen}
+        onClose={() => setIsVariablesModalOpen(false)}
+        title="Prompt Variables"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Use these placeholders to pull in pipeline outputs, image details, and community context.
+          </p>
+
+          <div className="grid gap-2 max-h-[400px] overflow-y-auto pr-2">
+            {PROMPT_VARIABLES.map((variable) => (
+              <div
+                key={variable}
+                className="flex items-center justify-between p-3 rounded-lg bg-card-bg/50 border border-card-border"
+              >
+                <code className="text-sm font-mono text-foreground">{variable}</code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(variable);
+                  }}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-card-border">
+            <Button
+              variant="secondary"
+              onClick={() => setIsVariablesModalOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
